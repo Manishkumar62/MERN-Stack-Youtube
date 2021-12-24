@@ -2,34 +2,39 @@ if(process.env.NODE_ENV !== 'production'){
     require('dotenv').config()
 }
 
-
 const express = require('express');
 const app = express();
-const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 
-//importing user model
 const User = require('./models/user');
+const auth = require('./middleware/auth');
 
-//connecting to database using url(DATABASE_URL) written in dotenv file
+const mongoose = require('mongoose');
 mongoose.connect(process.env.DATABASE_URL, {
     useNewUrlParser: true
-});
+})
 const db = mongoose.connection
-//if database has error in connection then showing error in console
 db.on('error',error => console.error(error))
-//once database connected then showing log in console
 db.once('open',() => console.log('Connected to Mongoose'))
 
-
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ limit:'10mb', extended:false }))
 app.use(cookieParser());
 
-//request for data on home page
 app.get('/',(req,res)=>{
-    res.json({"hollo ~":"Hi ~~"})
+    res.json({"Hello":"I am Manish"})
+})
+
+//request for data on home page
+app.get('/api/user/auth', auth, (req,res)=>{
+    res.status(200).json({
+        _id:req._id,
+        isAuth:true,
+        email:req.user.email,
+        name:req.user.name,
+        lastname:req.user.lastname,
+        role:req.user.role
+    })
 });
 
 //request for signUp or registeration
@@ -77,7 +82,7 @@ app.post('/api/user/login',(req,res)=>{
             //error in generating token sending error
             if(err) return res.status(400).send(err);
             res.cookie("x_auth", user.token)
-                .status(400)
+                .status(200)
                 .json({
                     loginSuccess:true
                 })
@@ -85,5 +90,13 @@ app.post('/api/user/login',(req,res)=>{
     })
 })
 
-//connecting to port written in dotenv file otherwise to 3000
+app.get('/api/user/logout',auth,(req,res)=>{
+    User.findOneAndUpdate({_id:req.user._id}, {token:""},(err, doc)=>{
+        if(err) return res.json({succes: false, err})
+        return res.status(200).send({
+            succes: true
+        })
+    })
+})
+
 app.listen(process.env.PORT || 3000)
