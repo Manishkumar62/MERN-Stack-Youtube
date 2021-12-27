@@ -4,6 +4,7 @@ if(process.env.NODE_ENV !== 'production'){
 
 const express = require('express');
 const app = express();
+const cors = require('cors')
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 
@@ -12,28 +13,37 @@ const auth = require('./middleware/auth');
 
 const mongoose = require('mongoose');
 mongoose.connect(process.env.DATABASE_URL, {
-    useNewUrlParser: true
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
 })
 const db = mongoose.connection
 db.on('error',error => console.error(error))
 db.once('open',() => console.log('Connected to Mongoose'))
 
+app.use(cors())
+
 app.use(bodyParser.urlencoded({ limit:'10mb', extended:false }))
+app.use(bodyParser.json());
 app.use(cookieParser());
+
+//use this to show the image you have in node js server to client (react js)
+//https://stackoverflow.com/questions/48914987/send-image-path-from-node-js-express-server-to-react-client
+app.use('/uploads', express.static('uploads'));
 
 app.get('/',(req,res)=>{
     res.json({"Hello":"I am Manish"})
 })
 
 //request for data on home page
-app.get('/api/user/auth', auth, (req,res)=>{
+app.get('/api/users/auth', auth, (req,res)=>{
     res.status(200).json({
         _id:req._id,
         isAuth:true,
         email:req.user.email,
         name:req.user.name,
         lastname:req.user.lastname,
-        role:req.user.role
+        role:req.user.role,
+        image: req.user.image,
     })
 });
 
@@ -49,7 +59,7 @@ app.post('/api/users/register',(req,res)=>{
         //saving data got error(like error return in password encryption) then showing error
         if(err) return res.json({success:false,err})
         //successful signUp and showing signUp data with status code 200
-        res.status(200).json({
+        return res.status(200).json({
             success:true,
             userData: doc
         });
@@ -57,7 +67,7 @@ app.post('/api/users/register',(req,res)=>{
 })
 
 //request for signIn or login
-app.post('/api/user/login',(req,res)=>{
+app.post('/api/users/login',(req,res)=>{
     //finding the email in database
     User.findOne({email:req.body.email},(err,user)=>{
         //if not able to find email then showing message
@@ -81,16 +91,17 @@ app.post('/api/user/login',(req,res)=>{
         user.generateToken((err, user)=>{
             //error in generating token sending error
             if(err) return res.status(400).send(err);
+            res.cookie("x_authExp", user.tokenExp);
             res.cookie("x_auth", user.token)
                 .status(200)
                 .json({
-                    loginSuccess:true
+                    loginSuccess:true, userId: user._id
                 })
         })
     })
 })
 
-app.get('/api/user/logout',auth,(req,res)=>{
+app.get('/api/users/logout',auth,(req,res)=>{
     User.findOneAndUpdate({_id:req.user._id}, {token:""},(err, doc)=>{
         if(err) return res.json({succes: false, err})
         return res.status(200).send({
@@ -99,4 +110,4 @@ app.get('/api/user/logout',auth,(req,res)=>{
     })
 })
 
-app.listen(process.env.PORT || 3000)
+app.listen(process.env.PORT || 5000);
